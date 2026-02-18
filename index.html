@@ -13,23 +13,19 @@ body{
     background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
     color:white;
 }
-
 .page{
     display:none;
     width:90%;
     margin:auto;
     padding:20px;
 }
-
 h1{ text-align:center; }
-
 .card{
     background:#112;
     padding:20px;
     border-radius:10px;
     margin-top:20px;
 }
-
 button{
     padding:10px 18px;
     margin:8px 0;
@@ -41,28 +37,15 @@ button{
     color:black;
     width:100%;
 }
-
 input{
     padding:10px;
     margin:6px 0;
 }
-
 label{ display:block; margin:5px 0; }
-
 .back{ background:#ff4d4d; color:white; }
-
 .disabled{ opacity:0.5; }
-
-.updateBtn{
-    background:#00ff99;
-    margin-top:8px;
-}
-
-.exportBtn{
-    background:#ffd700;
-    margin-top:15px;
-}
-
+.updateBtn{ background:#00ff99; margin-top:8px; }
+.exportBtn{ background:#ffd700; margin-top:15px; }
 </style>
 </head>
 
@@ -142,10 +125,10 @@ function addCustomer(){
     data.push({
         name:custName.value,
         phone:custPhone.value,
-        boards:custBoards.value,
+        boards:parseInt(custBoards.value),
         sent:sent.checked,
         received:received.checked,
-        time:new Date().toLocaleString()
+        time:new Date().toLocaleDateString()
     });
 
     localStorage.setItem("customers",JSON.stringify(data));
@@ -161,16 +144,19 @@ function addCustomer(){
 
 function loadData(){
     let data = JSON.parse(localStorage.getItem("customers")||"[]");
-
     let pendingHTML="";
     let historyHTML="";
 
     data.forEach((c,index)=>{
-
         if(c.sent && c.received){
-            historyHTML += `<p>${c.name} - ${c.phone} - ${c.boards} - ${c.time}</p>`;
+            historyHTML += `
+                <div style="margin-bottom:12px;">
+                    <p>${c.name} - ${c.phone} - ${c.boards} - ${c.time}</p>
+                    <button onclick="printBill(${index})">Print</button>
+                    <button onclick="deleteCustomer(${index})">Delete</button>
+                    <hr>
+                </div>`;
         } else {
-
             let sentChecked = c.sent ? "checked disabled" : "";
             let sentClass = c.sent ? "disabled" : "";
 
@@ -184,9 +170,9 @@ function loadData(){
                         <input type="checkbox" id="rec_${index}" ${c.received ? "checked" : ""}> Received
                     </label>
                     <button class="updateBtn" onclick="updateStatus(${index})">Update</button>
+                    <button onclick="deleteCustomer(${index})">Delete</button>
                     <hr>
-                </div>
-            `;
+                </div>`;
         }
     });
 
@@ -197,32 +183,114 @@ function loadData(){
 function updateStatus(index){
     let data = JSON.parse(localStorage.getItem("customers")||"[]");
     let recBox = document.getElementById("rec_"+index);
-
     data[index].received = recBox.checked;
-
     localStorage.setItem("customers",JSON.stringify(data));
     loadData();
 }
 
+function deleteCustomer(index){
+    let data = JSON.parse(localStorage.getItem("customers")||"[]");
+    if(confirm("Delete this record?")){
+        data.splice(index,1);
+        localStorage.setItem("customers",JSON.stringify(data));
+        loadData();
+    }
+}
+
+function printBill(index){
+    let data = JSON.parse(localStorage.getItem("customers")||"[]");
+    let c = data[index];
+
+    let rate = 1200;
+    let qty = Number(c.boards) || 0;
+    let subtotal = qty * rate;
+    let gst = subtotal * 0.18;
+    let delivery = 50;
+    let total = subtotal + gst + delivery;
+
+    let invoiceNo = "INV-" + Date.now();
+
+    let bill = `
+    <html>
+    <head>
+    <title>Invoice</title>
+    <style>
+    body{font-family:Arial;padding:30px;}
+    .top{display:flex;justify-content:space-between;}
+    table{width:100%;border-collapse:collapse;margin-top:20px;}
+    th,td{border:1px solid #000;padding:8px;text-align:center;}
+    .total{font-weight:bold;font-size:18px;}
+    </style>
+    </head>
+    <body onload="window.print()">
+    <div class="top">
+        <div>
+            <h2>SHK01 Electronics</h2>
+            <p>Coimbatore, Tamil Nadu</p>
+        </div>
+        <div>
+            <p><b>Invoice No:</b> ${invoiceNo}</p>
+            <p><b>Date:</b> ${c.time}</p>
+        </div>
+    </div>
+
+    <hr>
+    <p><b>Bill To:</b> ${c.name}</p>
+    <p><b>Phone:</b> ${c.phone}</p>
+
+    <table>
+        <tr>
+            <th>Description</th>
+            <th>Qty</th>
+            <th>Rate</th>
+            <th>Amount</th>
+        </tr>
+        <tr>
+            <td>SHK01 DSP Board</td>
+            <td>${qty}</td>
+            <td>â‚¹1200</td>
+            <td>â‚¹${subtotal.toFixed(2)}</td>
+        </tr>
+        <tr>
+            <td colspan="3">GST 18%</td>
+            <td>â‚¹${gst.toFixed(2)}</td>
+        </tr>
+        <tr>
+            <td colspan="3">Delivery Charges</td>
+            <td>â‚¹${delivery.toFixed(2)}</td>
+        </tr>
+        <tr class="total">
+            <td colspan="3">Grand Total</td>
+            <td>â‚¹${total.toFixed(2)}</td>
+        </tr>
+    </table>
+
+    <br><br>
+    <p><b>Terms:</b> Goods once sold cannot be returned.</p>
+    <p style="text-align:right;margin-top:60px;">Authorized Signature</p>
+    </body>
+    </html>
+    `;
+
+    let win = window.open("", "_blank");
+    win.document.write(bill);
+    win.document.close();
+}
+
 function exportExcel(){
     let data = JSON.parse(localStorage.getItem("customers")||"[]");
-
-    let csv = "Name,Phone,Boards,Sent,Received,Entry Time\n";
-
+    let csv="Name,Phone,Boards,Date\n";
     data.forEach(c=>{
-        csv += `${c.name},${c.phone},${c.boards},${c.sent},${c.received},${c.time}\n`;
+        csv+=`${c.name},${c.phone},${c.boards},${c.time}\n`;
     });
-
-    let blob = new Blob([csv], { type: "text/csv" });
-    let url = URL.createObjectURL(blob);
-    let a = document.createElement("a");
-    a.href = url;
-    a.download = "SHK01_Customer_Report.csv";
+    let blob=new Blob([csv],{type:"text/csv"});
+    let a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="SHK01_Customer_Report.csv";
     a.click();
 }
 
 showOnly("loginPage");
-
 </script>
 
 </body>
