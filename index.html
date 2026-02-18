@@ -1,0 +1,229 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHK01 Admin</title>
+
+<style>
+body{
+    font-family: Arial, sans-serif;
+    margin:0;
+    background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+    color:white;
+}
+
+.page{
+    display:none;
+    width:90%;
+    margin:auto;
+    padding:20px;
+}
+
+h1{ text-align:center; }
+
+.card{
+    background:#112;
+    padding:20px;
+    border-radius:10px;
+    margin-top:20px;
+}
+
+button{
+    padding:10px 18px;
+    margin:8px 0;
+    border:none;
+    border-radius:6px;
+    cursor:pointer;
+    font-weight:bold;
+    background:#00c6ff;
+    color:black;
+    width:100%;
+}
+
+input{
+    padding:10px;
+    margin:6px 0;
+}
+
+label{ display:block; margin:5px 0; }
+
+.back{ background:#ff4d4d; color:white; }
+
+.disabled{ opacity:0.5; }
+
+.updateBtn{
+    background:#00ff99;
+    margin-top:8px;
+}
+
+.exportBtn{
+    background:#ffd700;
+    margin-top:15px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="page" id="loginPage">
+    <h1>SHK01 Admin Login</h1>
+    <div class="card">
+        <input type="text" id="username" placeholder="Username"><br>
+        <input type="password" id="password" placeholder="Password"><br>
+        <button onclick="login()">Login</button>
+        <p id="loginError" style="color:red;"></p>
+    </div>
+</div>
+
+<div class="page" id="dashboardPage">
+    <h1>Dashboard</h1>
+    <div class="card">
+        <button onclick="goPage('addPage')">Add Customer</button>
+        <button onclick="goPage('pendingPage')">Pending Delivery</button>
+        <button onclick="goPage('historyPage')">Customer History</button>
+        <button class="exportBtn" onclick="exportExcel()">Download Excel Report</button>
+    </div>
+</div>
+
+<div class="page" id="addPage">
+    <h1>Add Customer</h1>
+    <div class="card">
+        <input type="text" id="custName" placeholder="Customer Name"><br>
+        <input type="text" id="custPhone" placeholder="Phone Number"><br>
+        <input type="number" id="custBoards" placeholder="Boards Ordered"><br>
+
+        <label><input type="checkbox" id="sent"> Sent</label>
+        <label><input type="checkbox" id="received"> Received</label>
+
+        <button onclick="addCustomer()">Submit</button>
+    </div>
+    <button class="back" onclick="goPage('dashboardPage')">Back</button>
+</div>
+
+<div class="page" id="pendingPage">
+    <h1>Pending Delivery</h1>
+    <div class="card" id="pendingList"></div>
+    <button class="back" onclick="goPage('dashboardPage')">Back</button>
+</div>
+
+<div class="page" id="historyPage">
+    <h1>Customer History</h1>
+    <div class="card" id="historyList"></div>
+    <button class="back" onclick="goPage('dashboardPage')">Back</button>
+</div>
+
+<script>
+
+function showOnly(id){
+    document.querySelectorAll('.page').forEach(p=>p.style.display='none');
+    document.getElementById(id).style.display='block';
+    window.scrollTo(0,0);
+}
+
+function login(){
+    if(username.value==="SHK01" && password.value==="hari999"){
+        showOnly("dashboardPage");
+    } else {
+        loginError.innerText="Invalid credentials";
+    }
+}
+
+function goPage(id){
+    showOnly(id);
+    loadData();
+}
+
+function addCustomer(){
+    let data = JSON.parse(localStorage.getItem("customers")||"[]");
+
+    data.push({
+        name:custName.value,
+        phone:custPhone.value,
+        boards:custBoards.value,
+        sent:sent.checked,
+        received:received.checked,
+        time:new Date().toLocaleString()
+    });
+
+    localStorage.setItem("customers",JSON.stringify(data));
+
+    custName.value="";
+    custPhone.value="";
+    custBoards.value="";
+    sent.checked=false;
+    received.checked=false;
+
+    alert("Customer Added");
+}
+
+function loadData(){
+    let data = JSON.parse(localStorage.getItem("customers")||"[]");
+
+    let pendingHTML="";
+    let historyHTML="";
+
+    data.forEach((c,index)=>{
+
+        if(c.sent && c.received){
+            historyHTML += `<p>${c.name} - ${c.phone} - ${c.boards} - ${c.time}</p>`;
+        } else {
+
+            let sentChecked = c.sent ? "checked disabled" : "";
+            let sentClass = c.sent ? "disabled" : "";
+
+            pendingHTML += `
+                <div style="margin-bottom:12px;">
+                    <p>${c.name} - ${c.phone} - ${c.boards} - ${c.time}</p>
+                    <label class="${sentClass}">
+                        <input type="checkbox" ${sentChecked}> Sent
+                    </label>
+                    <label>
+                        <input type="checkbox" id="rec_${index}" ${c.received ? "checked" : ""}> Received
+                    </label>
+                    <button class="updateBtn" onclick="updateStatus(${index})">Update</button>
+                    <hr>
+                </div>
+            `;
+        }
+    });
+
+    pendingList.innerHTML = pendingHTML || "No Pending Orders";
+    historyList.innerHTML = historyHTML || "No Completed Orders";
+}
+
+function updateStatus(index){
+    let data = JSON.parse(localStorage.getItem("customers")||"[]");
+    let recBox = document.getElementById("rec_"+index);
+
+    data[index].received = recBox.checked;
+
+    localStorage.setItem("customers",JSON.stringify(data));
+    loadData();
+}
+
+function exportExcel(){
+    let data = JSON.parse(localStorage.getItem("customers")||"[]");
+
+    let csv = "Name,Phone,Boards,Sent,Received,Entry Time\n";
+
+    data.forEach(c=>{
+        csv += `${c.name},${c.phone},${c.boards},${c.sent},${c.received},${c.time}\n`;
+    });
+
+    let blob = new Blob([csv], { type: "text/csv" });
+    let url = URL.createObjectURL(blob);
+    let a = document.createElement("a");
+    a.href = url;
+    a.download = "SHK01_Customer_Report.csv";
+    a.click();
+}
+
+showOnly("loginPage");
+
+</script>
+
+</body>
+</html>
