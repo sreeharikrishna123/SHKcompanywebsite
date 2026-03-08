@@ -1,0 +1,39 @@
+body{
+    font-family: Arial, sans-serif;
+    margin:0;
+    background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+    color:white;
+}
+.page{
+    display:none;
+    width:90%;
+    margin:auto;
+    padding:20px;
+}
+h1{ text-align:center; }
+.card{
+    background:#112;
+    padding:20px;
+    border-radius:10px;
+    margin-top:20px;
+}
+button{
+    padding:10px 18px;
+    margin:8px 0;
+    border:none;
+    border-radius:6px;
+    cursor:pointer;
+    font-weight:bold;
+    background:#00c6ff;
+    color:black;
+    width:100%;
+}
+input{
+    padding:10px;
+    margin:6px 0;
+}
+label{ display:block; margin:5px 0; }
+.back{ background:#ff4d4d; color:white; }
+.disabled{ opacity:0.5; }
+.updateBtn{ background:#00ff99; margin-top:8px; }
+.exportBtn{ background:#ffd700; margin-top:15px; }

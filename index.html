@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHK01 Admin</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="page" id="loginPage">
+<h1>SHK01 Admin Login</h1>
+<div class="card">
+<input type="text" id="username" placeholder="Username"><br>
+<input type="password" id="password" placeholder="Password"><br>
+<button onclick="login()">Login</button>
+<p id="loginError" style="color:red;"></p>
+</div>
+</div>
+
+<div class="page" id="dashboardPage">
+<h1>Dashboard</h1>
+<div class="card">
+<button onclick="goPage('addPage')">Add Customer</button>
+<button onclick="goPage('pendingPage')">Pending Delivery</button>
+<button onclick="goPage('historyPage')">Customer History</button>
+<button class="exportBtn" onclick="exportExcel()">Download Excel Report</button>
+</div>
+</div>
+
+<div class="page" id="addPage">
+<h1>Add Customer</h1>
+<div class="card">
+<input type="text" id="custName" placeholder="Customer Name"><br>
+<input type="text" id="custPhone" placeholder="Phone Number"><br>
+<input type="number" id="custBoards" placeholder="Boards Ordered"><br>
+
+<label><input type="checkbox" id="sent"> Sent</label>
+<label><input type="checkbox" id="received"> Received</label>
+
+<button onclick="addCustomer()">Submit</button>
+</div>
+<button class="back" onclick="goPage('dashboardPage')">Back</button>
+</div>
+
+<div class="page" id="pendingPage">
+<h1>Pending Delivery</h1>
+<div class="card" id="pendingList"></div>
+<button class="back" onclick="goPage('dashboardPage')">Back</button>
+</div>
+
+<div class="page" id="historyPage">
+<h1>Customer History</h1>
+<div class="card" id="historyList"></div>
+<button class="back" onclick="goPage('dashboardPage')">Back</button>
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getDatabase, ref, push, get, remove, update } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
+
+const firebaseConfig = {
+apiKey: "AIzaSyBSYnxzThxusM_3bGVMS8dQf4QEwgtC5G8",
+authDomain: "shk01-admin.firebaseapp.com",
+databaseURL: "https://shk01-admin-default-rtdb.asia-southeast1.firebasedatabase.app",
+projectId: "shk01-admin",
+storageBucket: "shk01-admin.firebasestorage.app",
+messagingSenderId: "867171249753",
+appId: "1:867171249753:web:91944de51eaf3ad3954b48",
+measurementId: "G-YPH3H6TBCJ"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const customersRef = ref(db,"customers");
+
+window.showOnly = function(id){
+document.querySelectorAll('.page').forEach(p=>p.style.display='none');
+document.getElementById(id).style.display='block';
+window.scrollTo(0,0);
+}
+
+window.login = function(){
+if(username.value==="SHK01" && password.value==="hari999"){
+showOnly("dashboardPage");
+}else{
+loginError.innerText="Invalid credentials";
+}
+}
+
+window.goPage = function(id){
+showOnly(id);
+loadData();
+}
+
+window.addCustomer = function(){
+
+push(customersRef,{
+name:custName.value,
+phone:custPhone.value,
+boards:parseInt(custBoards.value),
+sent:sent.checked,
+received:received.checked,
+time:new Date().toLocaleDateString()
+});
+
+custName.value="";
+custPhone.value="";
+custBoards.value="";
+sent.checked=false;
+received.checked=false;
+
+alert("Customer Added");
+
+}
+
+async function loadData(){
+
+let snapshot = await get(customersRef);
+
+let pendingHTML="";
+let historyHTML="";
+
+snapshot.forEach(child=>{
+
+let c = child.val();
+let key = child.key;
+
+if(c.sent && c.received){
+
+historyHTML+=`
+<div style="margin-bottom:12px;">
+<p>${c.name} - ${c.phone} - ${c.boards} - ${c.time}</p>
+<button onclick="printBill('${key}')">Print</button>
+<button onclick="deleteCustomer('${key}')">Delete</button>
+<hr>
+</div>
+`;
+
+}else{
+
+pendingHTML+=`
+<div style="margin-bottom:12px;">
+<p>${c.name} - ${c.phone} - ${c.boards} - ${c.time}</p>
+
+<label>
+<input type="checkbox" ${c.sent?'checked':''} disabled> Sent
+</label>
+
+<label>
+<input type="checkbox" id="rec_${key}" ${c.received?'checked':''}> Received
+</label>
+
+<button class="updateBtn" onclick="updateStatus('${key}')">Update</button>
+<button onclick="deleteCustomer('${key}')">Delete</button>
+<hr>
+</div>
+`;
+
+}
+
+});
+
+pendingList.innerHTML=pendingHTML||"No Pending Orders";
+historyList.innerHTML=historyHTML||"No Completed Orders";
+
+}
+
+window.updateStatus = async function(key){
+
+let recBox=document.getElementById("rec_"+key);
+
+await update(ref(db,"customers/"+key),{
+received:recBox.checked
+});
+
+loadData();
+
+}
+
+window.deleteCustomer = async function(key){
+
+if(confirm("Delete this record?")){
+await remove(ref(db,"customers/"+key));
+loadData();
+}
+
+}
+
+window.printBill = async function(key){
+
+let snapshot = await get(ref(db,"customers/"+key));
+let c = snapshot.val();
+
+let rate=1200;
+let qty=Number(c.boards)||0;
+let subtotal=qty*rate;
+let gst=subtotal*0.18;
+let delivery=50;
+let total=subtotal+gst+delivery;
+
+let invoiceNo="INV-"+Date.now();
+
+let bill=`
+<html>
+<head>
+<style>
+body{font-family:Arial;padding:30px;}
+table{width:100%;border-collapse:collapse;margin-top:20px;}
+th,td{border:1px solid #000;padding:8px;text-align:center;}
+</style>
+</head>
+
+<body onload="window.print()">
+
+<h2>SHK01 Electronics</h2>
+<p>Coimbatore, Tamil Nadu</p>
+
+<hr>
+
+<p><b>Customer:</b> ${c.name}</p>
+<p><b>Phone:</b> ${c.phone}</p>
+
+<table>
+
+<tr>
+<th>Description</th>
+<th>Qty</th>
+<th>Rate</th>
+<th>Amount</th>
+</tr>
+
+<tr>
+<td>SHK01 DSP Board</td>
+<td>${qty}</td>
+<td>1200</td>
+<td>${subtotal.toFixed(2)}</td>
+</tr>
+
+<tr>
+<td colspan="3">GST 18%</td>
+<td>${gst.toFixed(2)}</td>
+</tr>
+
+<tr>
+<td colspan="3">Delivery Charges</td>
+<td>${delivery.toFixed(2)}</td>
+</tr>
+
+<tr>
+<td colspan="3"><b>Total</b></td>
+<td><b>${total.toFixed(2)}</b></td>
+</tr>
+
+</table>
+
+<br><br>
+<p>Invoice No: ${invoiceNo}</p>
+
+</body>
+</html>
+`;
+
+let win=window.open("", "_blank");
+win.document.write(bill);
+win.document.close();
+
+}
+
+window.exportExcel = async function(){
+
+let snapshot = await get(customersRef);
+
+let csv="Name,Phone,Boards,Date\n";
+
+snapshot.forEach(child=>{
+let c=child.val();
+csv+=`${c.name},${c.phone},${c.boards},${c.time}\n`;
+});
+
+let blob=new Blob([csv],{type:"text/csv"});
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="SHK01_Customer_Report.csv";
+a.click();
+
+}
+
+showOnly("loginPage");
+
+</script>
+
+</body>
+</html>
